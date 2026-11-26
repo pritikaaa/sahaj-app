@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, Briefcase, Handshake, Search, Timer, Users } from "lucide-react";
+import { ArrowRight, Briefcase, CheckCircle2, ClipboardList, Handshake, Search, Timer, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileForm } from "@/components/profile-form";
 import { PickPerson } from "@/components/pick-person";
 import { SetupNeeded } from "@/components/setup-needed";
 import { VerificationBadge } from "@/components/badges";
-import { listHelpers, listOpenJobs, listProfiles, negotiationsInvolving } from "@/lib/data";
+import { jobsPostedBy, jobsWorkedBy, listHelpers, listOpenJobs, listProfiles, negotiationsInvolving } from "@/lib/data";
 import { currentProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -44,11 +44,34 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
     );
   }
 
-  const [helpers, jobs, live] = await Promise.all([
+  const [helpers, jobs, live, posted, worked] = await Promise.all([
     listHelpers({ excludeId: me.id }),
     listOpenJobs({ excludePosterId: me.id }),
     negotiationsInvolving(me.id, true),
+    jobsPostedBy(me.id),
+    jobsWorkedBy(me.id),
   ]);
+  const taken = worked.filter((j) => j.status !== "cancelled");
+  const stats = [
+    {
+      icon: ClipboardList,
+      label: "Jobs posted",
+      value: posted.length,
+      note: `${posted.filter((j) => j.status === "open").length} still open · ${posted.filter((j) => j.status === "completed").length} completed`,
+    },
+    {
+      icon: Briefcase,
+      label: "Jobs taken so far",
+      value: taken.length,
+      note: `${taken.filter((j) => j.status === "booked" || j.status === "in_progress").length} upcoming or in progress`,
+    },
+    {
+      icon: CheckCircle2,
+      label: "Jobs completed",
+      value: taken.filter((j) => j.status === "completed").length,
+      note: "As a helper",
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -58,6 +81,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           <p className="text-muted-foreground text-sm">{me.area ?? "Pokhara"} · hire help or find work — or both.</p>
         </div>
         {me.offers_help && <VerificationBadge p={me} />}
+      </section>
+
+      <section aria-label="Your dashboard" className="grid gap-3 sm:grid-cols-3">
+        {stats.map(({ icon: Icon, label, value, note }) => (
+          <Card key={label} className="first:border-primary first:border-t-4">
+            <CardContent className="space-y-1 text-center">
+              <Icon className="text-primary mx-auto size-4" aria-hidden />
+              <p className="font-display text-4xl font-bold tabular-nums">{value}</p>
+              <p className="text-muted-foreground italic">{label}</p>
+              <p className="text-muted-foreground text-xs">{note}</p>
+            </CardContent>
+          </Card>
+        ))}
       </section>
 
       {live.length > 0 && (
@@ -103,18 +139,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         </Card>
       </div>
 
-      <section aria-labelledby="how" className="space-y-3">
-        <h2 id="how" className="font-semibold">How Sahaj works</h2>
-        <ol className="grid gap-3 sm:grid-cols-3">
+      <section aria-labelledby="how" className="space-y-2">
+        <h2 id="how" className="text-xl font-bold">How Sahaj works</h2>
+        <ol className="grid gap-2 sm:grid-cols-3">
           {[
             { icon: Search, t: "Browse and choose", d: "Families pick helpers; helpers pick jobs. No auto-dispatch." },
             { icon: Handshake, t: "Agree a price in 1 minute", d: "Offer, counter, accept. NPR 300 minimum per visit." },
             { icon: Timer, t: "Book once or recurring", d: "Several chores per booking. SOS is one tap away." },
           ].map(({ icon: Icon, t, d }, i) => (
-            <li key={t} className="bg-card rounded-xl border p-4">
-              <Icon className="text-primary mb-2 size-5" aria-hidden />
-              <p className="font-medium">{i + 1}. {t}</p>
-              <p className="text-muted-foreground text-sm">{d}</p>
+            <li key={t} className="bg-card flex gap-2.5 rounded-md border px-3 py-2.5">
+              <Icon className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-display text-base leading-snug font-bold">{i + 1}. {t}</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">{d}</p>
+              </div>
             </li>
           ))}
         </ol>

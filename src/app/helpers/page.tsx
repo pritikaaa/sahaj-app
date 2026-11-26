@@ -39,7 +39,7 @@ export default async function HelpersPage({
         <p className="text-muted-foreground text-sm">Browse helpers and choose who you want. Verified helpers are listed first.</p>
       </div>
 
-      <form className="bg-card flex flex-wrap items-end gap-3 rounded-xl border p-3" aria-label="Filter helpers">
+      <form className="bg-card flex flex-wrap items-end gap-3 rounded-lg border p-3" aria-label="Filter helpers">
         <div className="min-w-40 flex-1 space-y-1">
           <label htmlFor="chore" className="text-sm font-medium">Chore</label>
           <NativeSelect id="chore" name="chore" defaultValue={sp.chore ?? ""}>

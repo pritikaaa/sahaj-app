@@ -31,11 +31,11 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const sos = (isPoster || isHelper) ? await sosForJob(job.id) : [];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       {job.status === "open" && isPoster && <AutoRefresh everyMs={4000} />}
       <Card>
         <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-xl">{job.title} <JobStatusBadge status={job.status} /></CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-2 text-2xl">{job.title} <JobStatusBadge status={job.status} /></CardTitle>
           <CardDescription className="space-y-1">
             <span className="flex items-center gap-1"><CalendarDays className="size-3.5" aria-hidden /> {describeSchedule(job)}</span>
             <span className="flex items-center gap-1"><MapPin className="size-3.5" aria-hidden /> {job.area}{(isPoster || isHelper) && job.address ? ` · ${job.address}` : ""}</span>
@@ -71,7 +71,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
 
       {sos.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">SOS on this booking</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">SOS on this booking</CardTitle></CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm">
               {sos.map((s) => <li key={s.id}>{people.get(s.raised_by)?.full_name ?? "Someone"} · {timeAgo(s.created_at)} · <strong>{s.status}</strong></li>)}
@@ -83,7 +83,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       {visibleNegs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{isPoster ? "Offers from helpers" : "Your offers"}</CardTitle>
+            <CardTitle className="text-lg">{isPoster ? "Offers from helpers" : "Your offers"}</CardTitle>
             {isPoster && job.status === "open" && <CardDescription>Each offer is live for one minute. Open it to accept or counter.</CardDescription>}
           </CardHeader>
           <CardContent>

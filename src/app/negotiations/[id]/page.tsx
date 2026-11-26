@@ -9,7 +9,7 @@ export default async function NegotiationPage({ params }: { params: Promise<{ id
   const r = await getNegotiationViewAction(id);
   if (!r.ok) notFound();
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Agree a price</h1>
       <NegotiationRoom key={id} initial={r.value} />
     </div>

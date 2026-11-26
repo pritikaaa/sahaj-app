@@ -171,6 +171,20 @@ export async function negotiationsInvolving(profileId: string, onlyActive = fals
 }
 
 // ---------- SOS ----------
+/** The person's most recent booked / in-progress job, as poster or helper. */
+export async function activeBookingFor(profileId: string): Promise<Job | null> {
+  const rows: Job[] = check(
+    await db()
+      .from("jobs")
+      .select("*")
+      .in("status", ["booked", "in_progress"])
+      .or(`poster_id.eq.${profileId},helper_id.eq.${profileId}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+  );
+  return rows[0] ?? null;
+}
+
 export async function insertSos(row: Partial<SosEvent>): Promise<SosEvent> {
   return check(await db().from("sos_events").insert(row).select("*").single());
 }
