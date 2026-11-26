@@ -51,7 +51,7 @@ function Section({ title, empty, children, count }: { title: string; empty: Reac
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab } = await searchParams;
   const me = await currentProfile();
-  if (!me) redirect("/");
+  if (!me) redirect("/signup");
   const [posted, working, negs] = await Promise.all([jobsPostedBy(me.id), jobsWorkedBy(me.id), negotiationsInvolving(me.id)]);
   const [jobs, people] = await Promise.all([
     getJobsById(negs.map((n) => n.job_id)),
@@ -59,12 +59,37 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   ]);
   const asHirer = negs.filter((n) => n.hirer_id === me.id);
   const asHelper = negs.filter((n) => n.helper_id === me.id);
+  const taken = working.filter((j) => j.status !== "cancelled");
+  const stats = [
+    {
+      label: "Jobs posted",
+      value: posted.length,
+      note: `${posted.filter((j) => j.status === "open").length} still open · ${posted.filter((j) => j.status === "completed").length} completed`,
+    },
+    {
+      label: "Jobs taken so far",
+      value: taken.length,
+      note: `${taken.filter((j) => j.status === "booked" || j.status === "in_progress").length} upcoming or in progress`,
+    },
+    { label: "Jobs completed", value: taken.filter((j) => j.status === "completed").length, note: "As a helper" },
+  ];
   const liveCount = (list: Negotiation[], jobId: string) => list.filter((n) => n.job_id === jobId && n.status === "active").length;
 
   return (
     <div className="space-y-4">
       <AutoRefresh everyMs={5000} />
-      <h1 className="text-2xl font-semibold tracking-tight">My activity</h1>
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">My activity</h1>
+      <section aria-label="Your dashboard" className="grid gap-4 sm:grid-cols-3">
+        {stats.map(({ label, value, note }) => (
+          <Card key={label}>
+            <CardContent className="space-y-1">
+              <p className="text-muted-foreground text-sm">{label}</p>
+              <p className="text-4xl font-semibold tabular-nums">{value}</p>
+              <p className="text-muted-foreground text-xs">{note}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
       <Tabs defaultValue={tab === "working" ? "working" : "hiring"}>
         <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="hiring">Hiring ({posted.length})</TabsTrigger>

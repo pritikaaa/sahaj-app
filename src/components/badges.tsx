@@ -1,20 +1,5 @@
-import { BadgeCheck, Clock, GraduationCap, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { verificationLabel } from "@/lib/format";
-import type { JobStatus, NegotiationStatus, Profile } from "@/lib/types";
-
-export function VerificationBadge({ p }: { p: Pick<Profile, "verification_status" | "verification_type"> }) {
-  const label = verificationLabel(p);
-  if (p.verification_status === "verified") {
-    return (
-      <Badge variant="success">
-        {p.verification_type === "student_id" ? <GraduationCap aria-hidden /> : <BadgeCheck aria-hidden />} {label}
-      </Badge>
-    );
-  }
-  if (p.verification_status === "pending") return <Badge variant="warning"><Clock aria-hidden /> {label}</Badge>;
-  return <Badge variant="outline" className="text-muted-foreground"><ShieldAlert aria-hidden /> {label}</Badge>;
-}
+import type { JobStatus, NegotiationStatus } from "@/lib/types";
 
 const JOB: Record<JobStatus, { label: string; variant: "default" | "secondary" | "success" | "outline" | "destructive" | "warning" }> = {
   open: { label: "Open", variant: "secondary" },

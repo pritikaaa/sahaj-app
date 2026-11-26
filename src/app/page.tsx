@@ -1,157 +1,75 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Briefcase, CheckCircle2, ClipboardList, Handshake, Search, Timer, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProfileForm } from "@/components/profile-form";
-import { PickPerson } from "@/components/pick-person";
+import { ArrowRight } from "lucide-react";
+import { FindHelp } from "@/components/find-help";
 import { SetupNeeded } from "@/components/setup-needed";
-import { VerificationBadge } from "@/components/badges";
-import { jobsPostedBy, jobsWorkedBy, listHelpers, listOpenJobs, listProfiles, negotiationsInvolving } from "@/lib/data";
+import { listHelpers } from "@/lib/data";
 import { currentProfile } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
-  const { new: wantsNew } = await searchParams;
-  let people;
+const STEPS = [
+  { n: "01", t: "Choose each other", d: "Families browse helpers. Helpers browse jobs. Both sides decide who they work with." },
+  { n: "02", t: "Make it fit your home", d: "Choose multiple chores and one-time or recurring help. Recurring jobs aren’t auto-scheduled." },
+  { n: "03", t: "Agree, then confirm", d: "Propose a price, accept, counter, or decline. Each negotiation session expires after 1 minute." },
+];
+
+export default async function Home() {
+  const me = await currentProfile();
+  let helpers;
   try {
-    people = await listProfiles();
+    helpers = await listHelpers({ excludeId: me?.id ?? null });
   } catch (e) {
     return <SetupNeeded message={e instanceof Error ? e.message : String(e)} />;
   }
-  const me = await currentProfile();
-
-  if (!me) {
-    return (
-      <div className="space-y-6">
-        <section className="space-y-2 pt-2">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Household help in Pokhara, on your terms</h1>
-          <p className="text-muted-foreground max-w-2xl">
-            Families browse verified helpers. Helpers and students browse jobs. Both sides choose, and agree a fair price in one minute.
-          </p>
-        </section>
-        {people.length > 0 && !wantsNew && <PickPerson people={people.map((p) => ({ id: p.id, full_name: p.full_name, area: p.area }))} />}
-        <Card>
-          <CardHeader>
-            <CardTitle>Create your profile</CardTitle>
-            <CardDescription>No password needed in this demo. One profile can hire and work.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ProfileForm mode="create" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const [helpers, jobs, live, posted, worked] = await Promise.all([
-    listHelpers({ excludeId: me.id }),
-    listOpenJobs({ excludePosterId: me.id }),
-    negotiationsInvolving(me.id, true),
-    jobsPostedBy(me.id),
-    jobsWorkedBy(me.id),
-  ]);
-  const taken = worked.filter((j) => j.status !== "cancelled");
-  const stats = [
-    {
-      icon: ClipboardList,
-      label: "Jobs posted",
-      value: posted.length,
-      note: `${posted.filter((j) => j.status === "open").length} still open · ${posted.filter((j) => j.status === "completed").length} completed`,
-    },
-    {
-      icon: Briefcase,
-      label: "Jobs taken so far",
-      value: taken.length,
-      note: `${taken.filter((j) => j.status === "booked" || j.status === "in_progress").length} upcoming or in progress`,
-    },
-    {
-      icon: CheckCircle2,
-      label: "Jobs completed",
-      value: taken.filter((j) => j.status === "completed").length,
-      note: "As a helper",
-    },
-  ];
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu" }).format(new Date());
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-wrap items-center gap-3 pt-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Namaste, {me.full_name.split(" ")[0]}</h1>
-          <p className="text-muted-foreground text-sm">{me.area ?? "Pokhara"} · hire help or find work — or both.</p>
+    <div className="space-y-10">
+      {/* Hero */}
+      <section className="bg-hero grid overflow-hidden rounded-3xl md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="space-y-5 px-6 py-8 sm:px-11 sm:py-10">
+          <p className="text-secondary-foreground text-xs font-semibold tracking-[0.18em] uppercase sm:text-sm">Household help, close to home</p>
+          <h1 className="text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">A little help. A lighter day.</h1>
+          <p className="max-w-xl text-lg leading-relaxed text-[#645a50] sm:text-xl">
+            Find household help in Pokhara that fits your needs. Browse, choose, and agree on a price together.
+          </p>
+          <p className="bg-background inline-block rounded-full px-4 py-2 text-sm text-[#675849]">For families. For local helpers.</p>
         </div>
-        {me.offers_help && <VerificationBadge p={me} />}
+        <div className="relative min-h-56 md:min-h-full">
+          <Image src="/images/hero.jpg" alt="Two women folding laundry together at a wooden table" fill priority sizes="(min-width: 768px) 33vw, 100vw" className="object-cover" />
+        </div>
       </section>
 
-      <section aria-label="Your dashboard" className="grid gap-3 sm:grid-cols-3">
-        {stats.map(({ icon: Icon, label, value, note }) => (
-          <Card key={label} className="first:border-primary first:border-t-4">
-            <CardContent className="space-y-1 text-center">
-              <Icon className="text-primary mx-auto size-4" aria-hidden />
-              <p className="font-display text-4xl font-bold tabular-nums">{value}</p>
-              <p className="text-muted-foreground italic">{label}</p>
-              <p className="text-muted-foreground text-xs">{note}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+      <FindHelp
+        helpers={helpers.map((h) => ({
+          id: h.id,
+          full_name: h.full_name,
+          bio: h.bio,
+          area: h.area,
+          chores: h.chores,
+          is_student: h.is_student,
+        }))}
+        signedIn={!!me}
+        defaultArea={me?.area ?? null}
+        today={today}
+      />
 
-      {live.length > 0 && (
-        <Card className="border-primary">
-          <CardContent className="flex items-center gap-3">
-            <Timer className="text-primary size-5" aria-hidden />
-            <p className="flex-1 text-sm"><strong>{live.length}</strong> live price negotiation{live.length > 1 ? "s" : ""} — each lasts one minute.</p>
-            <Button asChild size="sm"><Link href="/activity">Open</Link></Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Users className="text-primary size-5" aria-hidden /> Hire help</CardTitle>
-            <CardDescription>{helpers.length} helper{helpers.length === 1 ? "" : "s"} available · verified first</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button asChild><Link href="/helpers"><Search aria-hidden /> Browse helpers</Link></Button>
-            <Button asChild variant="outline"><Link href="/jobs/new">Post a job</Link></Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Briefcase className="text-primary size-5" aria-hidden /> Find work</CardTitle>
-            <CardDescription>
-              {me.offers_help
-                ? `${jobs.length} open job${jobs.length === 1 ? "" : "s"} from other families`
-                : "Turn on “I also offer help” in your profile to take paid gigs."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {me.offers_help ? (
-              <Button asChild><Link href="/jobs"><Search aria-hidden /> Browse jobs</Link></Button>
-            ) : (
-              <Button asChild><Link href="/profile">Start offering help <ArrowRight aria-hidden /></Link></Button>
-            )}
-            {me.offers_help && me.verification_status !== "verified" && (
-              <Button asChild variant="outline"><Link href="/profile#verify">Get verified</Link></Button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <section aria-labelledby="how" className="space-y-2">
-        <h2 id="how" className="text-xl font-bold">How Sahaj works</h2>
-        <ol className="grid gap-2 sm:grid-cols-3">
-          {[
-            { icon: Search, t: "Browse and choose", d: "Families pick helpers; helpers pick jobs. No auto-dispatch." },
-            { icon: Handshake, t: "Agree a price in 1 minute", d: "Offer, counter, accept. NPR 300 minimum per visit." },
-            { icon: Timer, t: "Book once or recurring", d: "Several chores per booking. SOS is one tap away." },
-          ].map(({ icon: Icon, t, d }, i) => (
-            <li key={t} className="bg-card flex gap-2.5 rounded-md border px-3 py-2.5">
-              <Icon className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
-              <div className="min-w-0">
-                <p className="font-display text-base leading-snug font-bold">{i + 1}. {t}</p>
-                <p className="text-muted-foreground text-xs leading-relaxed">{d}</p>
+      {/* How it works */}
+      <section id="how-it-works" className="bg-band -mx-4 -mb-16 scroll-mt-24 px-4 py-12 sm:-mx-8 sm:px-8 lg:-mx-20 lg:px-20">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">A simpler way to get help.</h2>
+          <Link href={me ? "/profile" : "/signup"} className="text-primary inline-flex items-center gap-1.5 font-semibold hover:underline">
+            Looking for work? Join as a helper <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+        <ol className="mt-10 grid gap-8 md:grid-cols-3">
+          {STEPS.map((s) => (
+            <li key={s.n} className="flex gap-5">
+              <span className="text-primary pt-1 font-semibold">{s.n}</span>
+              <div className="space-y-3">
+                <h3 className="text-xl font-semibold">{s.t}</h3>
+                <p className="text-muted-foreground leading-relaxed">{s.d}</p>
               </div>
             </li>
           ))}

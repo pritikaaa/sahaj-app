@@ -19,17 +19,17 @@ Existing alternative: **Maid Shree** (dispatches the nearest helper, fixed pay f
 ## 3. Must features (MVP)
 | # | Feature | MVP behaviour |
 |---|---|---|
-| M1 | 1-minute price negotiation | Either side opens with a price; the other accepts, counters or declines. Session lapses 60 s after it starts (counters don't extend it). Enforced by the server and a DB trigger. Max 6 offers. Price is **NPR per visit**, floor **NPR 300**, ceiling NPR 50,000. Lapsed sessions can be retried. |
+| M1 | 1-minute price negotiation | Either side opens with a price. Both sides can go back and forth within the one-minute window, up to 10 offers in total; the receiver of an offer can Accept or Counter (or decline). You can't accept your own offer, but you may change it by countering again. An accept or counter made against a price that just changed is refused. Session lapses 60 s after it starts (counters don't extend it). Enforced by the server and a DB trigger. Price is **NPR per visit**, floor **NPR 300**, ceiling NPR 50,000. Lapsed sessions can be retried. |
 | M2 | Gig access + verification | Anyone can offer help. Students verify with a **student ID**, adults with a **government ID** (citizenship, licence, passport). Status: unverified → pending → verified / rejected. Team reviews manually on the desk. ID numbers are visible only to the team. |
 | M3 | Browse and choose, both ways | Families browse helpers (filter by chore, verified, students; verified first) and hire one. Helpers browse open jobs (filter by chore) and make an offer. Hirers choose among offers. |
-| M4 | SOS | One-tap SOS (with confirm) during a booked / in-progress job. Records user, booking, time, GPS location. **Recipients:** the Sahaj Team desk (live list) + the person's trusted contact (call / SMS buttons with location). Police 100 shown. |
+| M4 | SOS | One-tap SOS (with confirm) during a booked / in-progress job. Records user, booking, time, GPS location. **Recipients:** SOS alerts the Sahaj team desk and dials the police (100). The trusted contact is stored on the event for the desk; there are no call / SMS buttons to the contact. |
 | M5 | Booking: one-time or recurring, multiple chores | A job has 1+ chores and is one-time, daily or weekly (chosen days). Lifecycle: open → booked → in progress → completed (or cancelled). |
 
 ## 4. Decisions on v0.1 open TODOs (team to confirm)
 - **Price unit / floor:** NPR per visit; floor NPR 300; ceiling NPR 50,000 (`src/lib/constants.ts` + schema CHECKs).
-- **Counteroffers:** max 6 offers per session (opening + 5 counters).
+- **Counteroffers:** max 10 offers per session (opening + up to 9 counters, from either side).
 - **Who may start:** the helper (offer on an open job) or the hirer (hire a browsed helper).
-- **SOS recipient:** Sahaj team desk + trusted contact stored on the profile; in-app channel (desk page) + phone/SMS links. No SMS gateway in MVP.
+- **SOS recipient:** SOS alerts the Sahaj team desk and dials the police (100). The trusted contact stays on the profile and the event for the desk. No SMS gateway in MVP.
 - **Non-student verification:** government ID number + issuing office, reviewed by the team.
 - **ID images:** not stored in MVP (number + issuer only; team checks the card in person / video).
 

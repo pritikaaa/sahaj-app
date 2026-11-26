@@ -10,8 +10,9 @@ export default async function NegotiationPage({ params }: { params: Promise<{ id
   if (!r.ok) notFound();
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Agree a price</h1>
-      <NegotiationRoom key={id} initial={r.value} />
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Agree a price</h1>
+      {/* Keyed by person too: after "Switch person" the room must start fresh as the new person. */}
+      <NegotiationRoom key={`${id}:${r.value.meId ?? "none"}`} initial={r.value} />
     </div>
   );
 }

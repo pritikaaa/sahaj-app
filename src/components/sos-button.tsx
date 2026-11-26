@@ -15,7 +15,7 @@ function getPosition(): Promise<GeolocationPosition | null> {
   );
 }
 
-/** M4: one tap → recorded event (time + location) → team desk + trusted contact. */
+/** M4: one tap → recorded event (time + location) → team desk alerted, phone dials the police. */
 export function SosButton({ jobId = null }: { jobId?: string | null }) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
@@ -33,6 +33,8 @@ export function SosButton({ jobId = null }: { jobId?: string | null }) {
       setArmed(false);
       if (!r.ok) return void toast.error(r.error);
       setSent(r.value);
+      // Open the dialer with the police number as soon as the SOS is recorded (phones only).
+      window.location.href = `tel:${POLICE_NUMBER}`;
       toast.error("SOS sent to the Sahaj team desk", { duration: 8000 });
       router.refresh();
     });
@@ -40,20 +42,14 @@ export function SosButton({ jobId = null }: { jobId?: string | null }) {
 
   if (sent) {
     const where = sent.latitude != null ? `https://maps.google.com/?q=${sent.latitude},${sent.longitude}` : null;
-    const sms = `SOS from Sahaj booking. ${where ? `Location: ${where}` : "Location not available."}`;
     return (
       <div role="alert" className="border-destructive bg-destructive/10 space-y-3 rounded-lg border p-4">
-        <p className="font-semibold">SOS sent. The Sahaj team desk has been alerted.</p>
+        <p className="font-semibold">SOS sent. The Sahaj team desk has been alerted and your phone is dialling the police ({POLICE_NUMBER}).</p>
         <p className="text-sm">{where ? "Your location was shared." : "Location was not available — tell the team where you are."}</p>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="destructive"><a href={`tel:${POLICE_NUMBER}`}><Phone aria-hidden /> Call police ({POLICE_NUMBER})</a></Button>
-          {sent.contact_phone && (
-            <>
-              <Button asChild variant="outline"><a href={`tel:${sent.contact_phone}`}>Call {sent.contact_name ?? "trusted contact"}</a></Button>
-              <Button asChild variant="outline"><a href={`sms:${sent.contact_phone}?body=${encodeURIComponent(sms)}`}>Text {sent.contact_name ?? "contact"}</a></Button>
-            </>
-          )}
-        </div>
+        {/* Manual fallback in case the browser blocked the automatic dial. */}
+        <Button asChild variant="destructive" size="lg" className="w-full">
+          <a href={`tel:${POLICE_NUMBER}`}><Phone aria-hidden /> Call police ({POLICE_NUMBER})</a>
+        </Button>
       </div>
     );
   }
@@ -61,7 +57,7 @@ export function SosButton({ jobId = null }: { jobId?: string | null }) {
   if (armed) {
     return (
       <div className="border-destructive space-y-3 rounded-lg border p-4">
-        <p className="font-medium">Send SOS now? The team desk sees your name, booking and location.</p>
+        <p className="font-medium">Send SOS now? SOS alerts the Sahaj team desk and dials the police ({POLICE_NUMBER}). The desk sees your name, booking and location.</p>
         <div className="flex gap-2">
           <Button variant="destructive" size="lg" disabled={pending} onClick={fire} className="flex-1">
             <Siren aria-hidden /> {pending ? "Sending…" : "Yes, send SOS"}

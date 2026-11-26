@@ -5,7 +5,16 @@ import { validatePrice } from "./validation";
 import type { Job, Negotiation, NegotiationStatus, Result } from "./types";
 
 export type NewNegotiation = Omit<Negotiation, "id" | "created_at" | "closed_at">;
-export type Response = { type: "counter"; price: number } | { type: "accept" } | { type: "decline" };
+/**
+ * `expectedOfferCount` is the offer_count of the view the person is looking at.
+ * If the price changed since, the response is refused so nobody accepts a price they didn't see.
+ */
+export type Response =
+  | { type: "counter"; price: number; expectedOfferCount?: number }
+  | { type: "accept"; expectedOfferCount?: number }
+  | { type: "decline" };
+
+export const PRICE_CHANGED = "The price just changed, check the new offer.";
 
 const fail = (error: string) => ({ ok: false as const, error });
 
@@ -71,9 +80,10 @@ export function respond(n: Negotiation, actorId: string, r: Response, now: Date)
       },
     };
   }
-  if (actorId === n.last_offer_by) return fail("Waiting for the other side to respond.");
+  if (r.expectedOfferCount !== undefined && r.expectedOfferCount !== n.offer_count) return fail(PRICE_CHANGED);
 
   if (r.type === "accept") {
+    if (actorId === n.last_offer_by) return fail("You can't accept your own offer.");
     return {
       ok: true,
       value: {
@@ -87,6 +97,7 @@ export function respond(n: Negotiation, actorId: string, r: Response, now: Date)
   const priceError = validatePrice(r.price);
   if (priceError) return fail(priceError);
   if (r.price === n.current_price) return fail("That is the current offer — accept it or offer a different price.");
+  // Either side may counter, including changing their own standing offer; each one counts.
   if (n.offer_count >= MAX_OFFERS) return fail("No counters left — accept or decline.");
   return {
     ok: true,
