@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileForm } from "@/components/profile-form";
@@ -39,8 +38,7 @@ export default async function ProfilePage() {
             {me.verification_status === "verified" && <p className="text-sm">You are verified. Families see your badge first in search.</p>}
             {me.verification_status === "pending" && (
               <p className="text-sm">
-                Submitted ({me.verification_type === "student_id" ? "student ID" : "government ID"} from {me.verification_issuer}). The team will review it on the{" "}
-                <Link className="text-primary underline" href="/desk">team desk</Link>.
+                Submitted ({me.verification_type === "student_id" ? "student ID" : "government ID"} from {me.verification_issuer}). The Sahaj team will review it soon.
               </p>
             )}
             {(me.verification_status === "unverified" || me.verification_status === "rejected") && (

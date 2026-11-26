@@ -178,7 +178,7 @@ export function NegotiationRoom({ initial }: { initial: NegotiationView }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Offers ({n.offer_count}/{MAX_OFFERS})</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Offers ({n.offer_count}/{MAX_OFFERS})</CardTitle></CardHeader>
         <CardContent>
           <ol className="space-y-1.5 text-sm">
             {n.history.map((h, i) => (

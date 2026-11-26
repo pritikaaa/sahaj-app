@@ -332,19 +332,25 @@ export async function setJobStatusAction(jobId: string, status: "in_progress" | 
 
 // ---------------------------------------------------------------- SOS
 export async function raiseSosAction(
-  jobId: string,
+  jobId: string | null,
   loc: { latitude?: number | null; longitude?: number | null; accuracy?: number | null; message?: string | null }
 ): Promise<Result<SosEvent>> {
   const me = await requireMe();
   if (!me.ok) return me;
-  const job = await data.getJob(jobId);
-  if (!job) return fail("Booking not found.");
-  if (job.poster_id !== me.value && job.helper_id !== me.value) return fail("SOS is available to the two people in this booking.");
-  if (!["booked", "in_progress"].includes(job.status)) return fail("SOS is available during an active booking.");
+  let job: Job | null = null;
+  if (jobId) {
+    job = await data.getJob(jobId);
+    if (!job) return fail("Booking not found.");
+    if (job.poster_id !== me.value && job.helper_id !== me.value) return fail("SOS is available to the two people in this booking.");
+    if (!["booked", "in_progress"].includes(job.status)) return fail("SOS is available during an active booking.");
+  } else {
+    // Raised from the SOS page: attach the person's active booking if they have one.
+    job = await data.activeBookingFor(me.value);
+  }
   const profile = await data.getProfile(me.value);
   const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
   const sos = await data.insertSos({
-    job_id: jobId,
+    job_id: job?.id ?? null,
     raised_by: me.value,
     latitude: num(loc.latitude),
     longitude: num(loc.longitude),

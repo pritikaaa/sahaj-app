@@ -16,7 +16,7 @@ function getPosition(): Promise<GeolocationPosition | null> {
 }
 
 /** M4: one tap → recorded event (time + location) → team desk + trusted contact. */
-export function SosButton({ jobId }: { jobId: string }) {
+export function SosButton({ jobId = null }: { jobId?: string | null }) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [sent, setSent] = useState<SosEvent | null>(null);

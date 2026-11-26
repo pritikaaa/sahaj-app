@@ -42,7 +42,7 @@ function NegRow({ n, jobs, people, meId }: { n: Negotiation; jobs: Map<string, J
 function Section({ title, empty, children, count }: { title: string; empty: React.ReactNode; children: React.ReactNode; count: number }) {
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-lg">{title}</CardTitle></CardHeader>
       <CardContent>{count === 0 ? <p className="text-muted-foreground text-sm">{empty}</p> : <ul className="divide-y">{children}</ul>}</CardContent>
     </Card>
   );

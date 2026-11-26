@@ -29,7 +29,7 @@ export function LiveBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div role="status" aria-live="polite" className="mx-auto max-w-5xl space-y-2 px-4 pt-3">
+    <div role="status" aria-live="polite" className="w-full space-y-2 px-4 pt-3 sm:px-6 lg:px-10">
       {visible.map((i) => {
         const left = Math.max(0, Math.ceil((Date.parse(i.expiresAt) - now) / 1000));
         return (
