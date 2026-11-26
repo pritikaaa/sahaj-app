@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
-import { respond, secondsLeft, startNegotiation, type Response } from "@/lib/negotiation";
+import { PRICE_CHANGED, respond, secondsLeft, startNegotiation, type Response } from "@/lib/negotiation";
 import { currentProfileId, setCurrentProfile } from "@/lib/session";
 import { parsePrice, validateJobInput, validateProfileInput, validateVerification } from "@/lib/validation";
 import { toPublic, type PublicProfile } from "@/lib/public-profile";
-import type { Job, Negotiation, Result, SosEvent, SosStatus } from "@/lib/types";
+import { noticeText, respondNotices, startNotices, type Notice } from "@/lib/notifications";
+import type { Job, Negotiation, Notification, NotificationKind, Result, SosEvent, SosStatus } from "@/lib/types";
 
 const fail = (error: string) => ({ ok: false as const, error });
 const ok = <T>(value: T) => ({ ok: true as const, value });
@@ -22,6 +23,80 @@ function friendly(e: unknown): string {
   if (msg.includes("negotiations_one_active_idx")) return "You already have a live negotiation on this job.";
   if (msg.includes("violates check constraint")) return "Some values are outside the allowed range.";
   return msg;
+}
+
+// ---------------------------------------------------------------- notifications (internal)
+/** Save one in-app notification. Never throws: a failed notification must not break an offer. */
+async function notify(
+  profileId: string,
+  kind: NotificationKind,
+  title: string,
+  body: string | null,
+  negotiationId: string | null
+): Promise<void> {
+  try {
+    await data.insertNotification({ profile_id: profileId, kind, title, body, negotiation_id: negotiationId });
+  } catch {
+    // swallowed on purpose
+  }
+}
+
+/** Write each notice with names from the recipient's side. Never throws. */
+async function notifyAll(
+  notices: Notice[],
+  n: Pick<Negotiation, "id" | "job_id" | "hirer_id" | "helper_id" | "current_price">,
+  price = n.current_price
+): Promise<void> {
+  try {
+    const [job, people] = await Promise.all([data.getJob(n.job_id), data.getProfilesById([n.hirer_id, n.helper_id])]);
+    await Promise.all(
+      notices.map(({ to, kind }) => {
+        const otherId = to === n.hirer_id ? n.helper_id : n.hirer_id;
+        const t = noticeText(kind, {
+          otherName: people.get(otherId)?.full_name ?? "Someone",
+          jobTitle: job?.title ?? "Job",
+          price,
+        });
+        return notify(to, kind, t.title, t.body, n.id);
+      })
+    );
+  } catch {
+    // swallowed on purpose
+  }
+}
+
+/**
+ * Lapses have no action to hook into, so when this person's bell loads we look for
+ * sessions that ran out in the last hour and add one "lapsed" item per session.
+ * Idempotent: skips sessions already notified (a unique index backs this up).
+ */
+async function syncLapsed(meId: string): Promise<void> {
+  try {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    const lapsed = (await data.negotiationsInvolving(meId)).filter(
+      (n) => n.status === "expired" && Date.parse(n.closed_at ?? n.expires_at) > cutoff
+    );
+    if (lapsed.length === 0) return;
+    const done = await data.notifiedNegotiationIds(meId, "lapsed", lapsed.map((n) => n.id));
+    for (const n of lapsed) {
+      if (!done.has(n.id)) await notifyAll([{ to: meId, kind: "lapsed" }], n);
+    }
+  } catch {
+    // swallowed on purpose
+  }
+}
+
+/** A just-created job whose first negotiation failed: remove it so it doesn't sit Open with no offer. */
+async function discardJob(jobId: string): Promise<void> {
+  try {
+    await data.deleteJob(jobId);
+  } catch {
+    try {
+      await data.updateJobIf(jobId, ["open"], { status: "cancelled" });
+    } catch {
+      // nothing more to do; the original error is what the user sees
+    }
+  }
 }
 
 async function requireMe(): Promise<Result<string>> {
@@ -57,6 +132,16 @@ export async function switchProfileAction(id: string | null): Promise<Result<nul
   await setCurrentProfile(id);
   revalidatePath("/", "layout");
   return ok(null);
+}
+
+/** Names for the demo "Switch person" menu. Names only, nothing private. */
+export async function listPeopleAction(): Promise<{ id: string; full_name: string }[]> {
+  try {
+    const meId = await currentProfileId();
+    return (await data.listProfiles()).filter((p) => p.id !== meId).map((p) => ({ id: p.id, full_name: p.full_name }));
+  } catch {
+    return [];
+  }
 }
 
 export async function saveProfileAction(raw: Record<string, unknown>): Promise<Result<null>> {
@@ -133,19 +218,28 @@ export async function postJobAction(
     const helper = await data.getProfile(invitedHelperId);
     if (!helper || !helper.offers_help) return fail("That helper is not available.");
   }
+  let jobId: string | null = null;
+  let negotiationId: string | null = null;
   try {
     const job = await data.insertJob({ ...v.value, poster_id: me.value, invited_helper_id: invitedHelperId ?? null });
-    let negotiationId: string | null = null;
+    jobId = job.id;
     if (invitedHelperId) {
       const n = startNegotiation({
         job, hirerId: me.value, helperId: invitedHelperId, actorId: me.value, price: v.value.budget, now: new Date(),
       });
-      if (!n.ok) return n;
-      negotiationId = (await data.insertNegotiation(n.value)).id;
+      if (!n.ok) {
+        await discardJob(job.id);
+        return n;
+      }
+      const row = await data.insertNegotiation(n.value);
+      negotiationId = row.id;
+      await notifyAll(startNotices(row), row);
     }
     revalidatePath("/", "layout");
     return ok({ jobId: job.id, negotiationId });
   } catch (e) {
+    // Hiring a chosen helper is one step for the family: if the offer couldn't be saved, don't leave the job behind.
+    if (jobId && invitedHelperId && !negotiationId) await discardJob(jobId);
     return fail(friendly(e));
   }
 }
@@ -168,6 +262,7 @@ export async function makeOfferAction(jobId: string, priceInput: unknown): Promi
   if (!n.ok) return n;
   try {
     const row = await data.insertNegotiation(n.value);
+    await notifyAll(startNotices(row), row);
     revalidatePath("/", "layout");
     return ok({ negotiationId: row.id });
   } catch (e) {
@@ -192,6 +287,7 @@ export async function reopenNegotiationAction(negotiationId: string, priceInput:
   if (!n.ok) return n;
   try {
     const row = await data.insertNegotiation(n.value);
+    await notifyAll(startNotices(row), row);
     revalidatePath("/", "layout");
     return ok({ negotiationId: row.id });
   } catch (e) {
@@ -229,9 +325,20 @@ export async function getNegotiationViewAction(id: string): Promise<Result<Negot
   });
 }
 
-export async function respondAction(id: string, r: Response): Promise<Result<NegotiationView>> {
+/**
+ * `asId` is the person this screen is showing. The demo "acting as" cookie is shared by every
+ * tab in the browser, so if someone switched person in another tab we refuse rather than
+ * act for the wrong person.
+ */
+export async function respondAction(id: string, r: Response, asId?: string | null): Promise<Result<NegotiationView>> {
   const me = await requireMe();
   if (!me.ok) return me;
+  if (asId && asId !== me.value) {
+    const now = await data.getProfile(me.value);
+    return fail(
+      `This browser is now acting as ${now?.full_name ?? "someone else"} (switched in another tab), so nothing was sent. Check the screen and try again.`
+    );
+  }
   const n = await data.getNegotiation(id);
   if (!n) return fail("Negotiation not found.");
   const decided = respond(n, me.value, r, new Date());
@@ -250,22 +357,31 @@ export async function respondAction(id: string, r: Response): Promise<Result<Neg
         await data.updateActiveNegotiation(id, { status: "declined", closed_at: new Date().toISOString() });
         return fail("Someone else was booked for this job first.");
       }
-      // 2) accept the session — the DB trigger re-checks the minute
+      // 2) accept the session only if the price is still the one read above —
+      //    the DB trigger re-checks the minute
       try {
-        const accepted = await data.updateActiveNegotiation(id, decided.value);
-        if (!accepted) throw new Error("This negotiation just closed.");
+        const accepted = await data.updateActiveNegotiation(id, decided.value, n.offer_count);
+        if (!accepted) {
+          const now = await data.getNegotiation(id);
+          throw new Error(now?.status === "active" ? PRICE_CHANGED : "This negotiation just closed.");
+        }
       } catch (e) {
         await data.updateJobIf(n.job_id, ["booked"], { status: "open", helper_id: null, agreed_price: null, booked_at: null });
         return fail(friendly(e));
       }
       await data.declineOtherActive(n.job_id, id);
     } else {
-      const updated = await data.updateActiveNegotiation(id, decided.value);
-      if (!updated) return fail("This negotiation just closed.");
+      // Counters are guarded the same way; a decline goes through whatever the price.
+      const updated = await data.updateActiveNegotiation(id, decided.value, r.type === "counter" ? n.offer_count : undefined);
+      if (!updated) {
+        const now = await data.getNegotiation(id);
+        return fail(r.type === "counter" && now?.status === "active" ? PRICE_CHANGED : "This negotiation just closed.");
+      }
     }
   } catch (e) {
     return fail(friendly(e));
   }
+  await notifyAll(respondNotices(r.type, me.value, n), n, r.type === "counter" ? r.price : n.current_price);
   revalidatePath("/", "layout");
   return getNegotiationViewAction(id);
 }
@@ -276,6 +392,7 @@ export interface LiveItem {
   otherName: string;
   price: number;
   myTurn: boolean;
+  offerCount: number;
   expiresAt: string;
 }
 
@@ -298,11 +415,55 @@ export async function liveNegotiationsAction(): Promise<LiveItem[]> {
         otherName: people.get(otherId)?.full_name ?? "Someone",
         price: n.current_price,
         myTurn: n.last_offer_by !== meId,
+        offerCount: n.offer_count,
         expiresAt: n.expires_at,
       };
     });
   } catch {
     return [];
+  }
+}
+
+// ---------------------------------------------------------------- notification bell
+export type NotificationItem = Pick<Notification, "id" | "negotiation_id" | "kind" | "title" | "body" | "read_at" | "created_at">;
+
+/** Polled by the header bell. Also records any of this person's offers that just lapsed. */
+export async function listNotificationsAction(): Promise<Result<{ items: NotificationItem[]; unread: number }>> {
+  const meId = await currentProfileId();
+  if (!meId) return ok({ items: [], unread: 0 });
+  try {
+    await syncLapsed(meId);
+    const [rows, unread] = await Promise.all([data.listNotifications(meId), data.unreadNotificationCount(meId)]);
+    return ok({
+      items: rows.map(({ id, negotiation_id, kind, title, body, read_at, created_at }) => ({
+        id, negotiation_id, kind, title, body, read_at, created_at,
+      })),
+      unread,
+    });
+  } catch (e) {
+    return fail(friendly(e));
+  }
+}
+
+export async function markNotificationReadAction(id: string): Promise<Result<null>> {
+  const me = await requireMe();
+  if (!me.ok) return me;
+  try {
+    await data.markNotificationRead(id, me.value);
+    return ok(null);
+  } catch (e) {
+    return fail(friendly(e));
+  }
+}
+
+export async function markAllNotificationsReadAction(): Promise<Result<null>> {
+  const me = await requireMe();
+  if (!me.ok) return me;
+  try {
+    await data.markAllRead(me.value);
+    return ok(null);
+  } catch (e) {
+    return fail(friendly(e));
   }
 }
 

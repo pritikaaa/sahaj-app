@@ -4,7 +4,7 @@ import { CalendarDays, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { JobStatusBadge, NegotiationBadge, VerificationBadge } from "@/components/badges";
+import { JobStatusBadge, NegotiationBadge } from "@/components/badges";
 import { JobActions } from "@/components/job-actions";
 import { OfferForm } from "@/components/offer-form";
 import { SosButton } from "@/components/sos-button";
@@ -49,7 +49,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             {helper && (
               <div className="col-span-2">
                 <dt className="text-muted-foreground">Helper</dt>
-                <dd className="flex flex-wrap items-center gap-2">{isHelper ? "You" : helper.full_name} <VerificationBadge p={helper} /></dd>
+                <dd className="flex flex-wrap items-center gap-2">{isHelper ? "You" : helper.full_name}</dd>
               </div>
             )}
           </dl>
@@ -93,7 +93,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
                 return (
                   <li key={n.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
                     <span className="min-w-0 flex-1">
-                      <strong>{h?.full_name}</strong> {h && <VerificationBadge p={h} />}
+                      <strong>{h?.full_name}</strong>
                       <span className="text-muted-foreground"> · {formatNPR(n.current_price)} · {timeAgo(n.created_at)}</span>
                     </span>
                     <NegotiationBadge status={n.status} />

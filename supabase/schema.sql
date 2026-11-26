@@ -93,13 +93,17 @@ alter table public.negotiations
   add column if not exists current_price integer
     check (current_price between 300 and 50000),
   add column if not exists last_offer_by uuid references public.profiles(id) on delete cascade,
-  add column if not exists offer_count integer not null default 1
-    check (offer_count between 1 and 6),
+  add column if not exists offer_count integer not null default 1,
   add column if not exists history jsonb not null default '[]'::jsonb,
   add column if not exists status text not null default 'active'
     check (status in ('active', 'accepted', 'declined', 'expired')),
   add column if not exists expires_at timestamptz,
   add column if not exists closed_at timestamptz;
+
+-- Up to 10 offers per session (opening + up to 9 counters, either side).
+-- Must match MAX_OFFERS in src/lib/constants.ts. Same as two_way_counters.sql.
+alter table public.negotiations drop constraint if exists negotiations_offer_count_check;
+alter table public.negotiations add constraint negotiations_offer_count_check check (offer_count >= 1 and offer_count <= 10);
 
 -- one live session per job + helper at a time
 create unique index if not exists negotiations_one_active_idx
@@ -180,4 +184,32 @@ create policy "anon full access" on public.jobs
 create policy "anon full access" on public.negotiations
   for all to anon using (true) with check (true);
 create policy "anon full access" on public.sos_events
+  for all to anon using (true) with check (true);
+
+-- ---------------------------------------------------------------------
+-- notifications: in-app bell items for negotiation events.
+-- (Same as supabase/migrations_notifications.sql, for existing projects.)
+-- Text holds names, job title and price only (never phones, IDs or
+-- trusted contacts).
+-- ---------------------------------------------------------------------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  negotiation_id uuid references public.negotiations(id) on delete cascade,
+  kind text not null check (kind in ('offer_received','offer_sent','countered','accepted','declined','lapsed')),
+  title text not null,
+  body text,
+  read_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists notifications_profile_idx
+  on public.notifications (profile_id, read_at, created_at desc);
+-- a lapsed session is announced once per person (the app checks first; this backs it up)
+create unique index if not exists notifications_lapsed_once_idx
+  on public.notifications (profile_id, negotiation_id) where kind = 'lapsed';
+
+grant select, insert, update, delete on public.notifications to anon;
+alter table public.notifications enable row level security;
+drop policy if exists "anon full access" on public.notifications;
+create policy "anon full access" on public.notifications
   for all to anon using (true) with check (true);

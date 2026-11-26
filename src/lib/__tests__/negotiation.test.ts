@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { respond, secondsLeft, startNegotiation, effectiveStatus } from "../negotiation";
+import { PRICE_CHANGED, respond, secondsLeft, startNegotiation, effectiveStatus } from "../negotiation";
 import type { Job, Negotiation } from "../types";
 
 const HIRER = "hirer-1";
@@ -80,16 +80,48 @@ describe("respond", () => {
     expect(n.history.map((h) => h.action)).toEqual(["offer", "counter", "accept"]);
   });
 
-  it("does not let you accept or counter your own offer", () => {
+  it("does not let you accept your own offer", () => {
     const n = started(1000);
-    expect(respond(n, HELPER, { type: "accept" }, at(5))).toEqual({ ok: false, error: "Waiting for the other side to respond." });
-    expect(respond(n, HELPER, { type: "counter", price: 900 }, at(5)).ok).toBe(false);
+    expect(respond(n, HELPER, { type: "accept" }, at(5))).toEqual({ ok: false, error: "You can't accept your own offer." });
+  });
+
+  it("lets the same person counter twice (change their standing offer); each counts", () => {
+    let n = started(1000);
+    for (const p of [950, 900]) {
+      const r = respond(n, HELPER, { type: "counter", price: p }, at(5));
+      if (!r.ok) throw new Error(r.error);
+      n = apply(n, r.value);
+    }
+    expect(n.current_price).toBe(900);
+    expect(n.last_offer_by).toBe(HELPER);
+    expect(n.offer_count).toBe(3);
+    expect(respond(n, HELPER, { type: "accept" }, at(6)).ok).toBe(false);
+    expect(respond(n, HIRER, { type: "accept" }, at(6)).ok).toBe(true);
+  });
+
+  it("refuses accept or counter made against a stale view", () => {
+    let n = started(1000);
+    const c = respond(n, HIRER, { type: "counter", price: 800, expectedOfferCount: 1 }, at(5));
+    if (!c.ok) throw new Error(c.error);
+    n = apply(n, c.value);
+    // The helper's screen still shows offer 1 (NPR 1,000) when they tap Accept.
+    expect(respond(n, HELPER, { type: "accept", expectedOfferCount: 1 }, at(6))).toEqual({ ok: false, error: PRICE_CHANGED });
+    expect(respond(n, HELPER, { type: "counter", price: 900, expectedOfferCount: 1 }, at(6))).toEqual({ ok: false, error: PRICE_CHANGED });
+    expect(respond(n, HELPER, { type: "accept", expectedOfferCount: 2 }, at(6)).ok).toBe(true);
   });
 
   it("cannot be accepted once the minute has passed", () => {
     const n = started(1000);
     expect(respond(n, HIRER, { type: "accept" }, at(59)).ok).toBe(true);
     expect(respond(n, HIRER, { type: "accept" }, at(61))).toEqual({ ok: false, error: "Time is up — this offer lapsed after one minute." });
+  });
+
+  it("expiry blocks counters (either side) and decline too", () => {
+    const n = started(1000);
+    const lapsed = { ok: false, error: "Time is up — this offer lapsed after one minute." };
+    expect(respond(n, HIRER, { type: "counter", price: 900 }, at(61))).toEqual(lapsed);
+    expect(respond(n, HELPER, { type: "counter", price: 900 }, at(61))).toEqual(lapsed);
+    expect(respond(n, HIRER, { type: "decline" }, at(61))).toEqual(lapsed);
   });
 
   it("counters do not extend the one-minute window", () => {
@@ -107,9 +139,9 @@ describe("respond", () => {
     expect(respond(n, HIRER, { type: "counter", price: 50001 }, at(5)).ok).toBe(false);
   });
 
-  it("caps the number of offers", () => {
+  it("caps the number of offers at 10 (the 10th succeeds, an 11th fails)", () => {
     let n = started(1000);
-    const prices = [600, 950, 650, 900, 700];
+    const prices = [600, 950, 650, 900, 700, 880, 720, 860, 750];
     let who = HIRER;
     for (const p of prices) {
       const r = respond(n, who, { type: "counter", price: p }, at(5));
@@ -117,7 +149,8 @@ describe("respond", () => {
       n = apply(n, r.value);
       who = who === HIRER ? HELPER : HIRER;
     }
-    expect(n.offer_count).toBe(6);
+    expect(n.offer_count).toBe(10);
+    expect(n.current_price).toBe(750);
     expect(respond(n, who, { type: "counter", price: 800 }, at(6))).toEqual({ ok: false, error: "No counters left — accept or decline." });
     expect(respond(n, who, { type: "accept" }, at(6)).ok).toBe(true);
   });

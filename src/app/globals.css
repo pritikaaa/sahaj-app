@@ -6,10 +6,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-merriweather), Georgia, serif;
-  --font-serif: var(--font-merriweather), Georgia, serif;
-  --font-display: var(--font-playfair), Georgia, serif;
-  --font-mono: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-hero: var(--hero);
+  --color-band: var(--band);
+  --color-success-soft: var(--success-soft);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -35,54 +37,60 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Sahaj palette: warm cream paper, olive green (#6b7f5b) accent, brown ink. */
+/* Sahaj palette — sampled from the Figma design: warm paper, terracotta accent, brown ink. */
 :root {
-  --radius: 0.375rem;
-  --background: #f8f5f0;
-  --foreground: #2b1d17;
+  --radius: 0.75rem;
+  --background: #fbf9f5;
+  --foreground: #3c362e;
   --card: #ffffff;
-  --card-foreground: #2b1d17;
+  --card-foreground: #3c362e;
   --popover: #ffffff;
-  --popover-foreground: #2b1d17;
-  --primary: #6b7f5b;
+  --popover-foreground: #3c362e;
+  --primary: #a94730;
   --primary-foreground: #ffffff;
-  --secondary: #ebefe6;
-  --secondary-foreground: #4a5a3e;
-  --muted: #f2ece4;
-  --muted-foreground: #76665d;
-  --accent: #f2f4ee;
-  --accent-foreground: #4a5a3e;
+  --secondary: #f5e4dc;
+  --secondary-foreground: #98422e;
+  --muted: #f6f3ed;
+  --muted-foreground: #777066;
+  --accent: #f5f2ec;
+  --accent-foreground: #3c362e;
   --destructive: #b3261e;
-  --success: #2f6b4a;
-  --warning: #e3b94f;
-  --warning-foreground: #7a5512;
-  --border: #e6ddd2;
-  --input: #ddd2c5;
-  --ring: #6b7f5b;
+  --success: #486040;
+  --success-soft: #edf1e8;
+  --warning: #eab54a;
+  --warning-foreground: #896325;
+  --border: #e7e2da;
+  --input: #dcd8d2;
+  --ring: #a94730;
+  --hero: #f0e5d7;
+  --band: #f0ebe2;
 }
 
 .dark {
-  --background: #1d1613;
-  --foreground: #f3ece4;
-  --card: #261d19;
-  --card-foreground: #f3ece4;
-  --popover: #261d19;
-  --popover-foreground: #f3ece4;
-  --primary: #a7b896;
-  --primary-foreground: #1d1613;
-  --secondary: #2c3325;
-  --secondary-foreground: #e4ead9;
-  --muted: #2e241f;
-  --muted-foreground: #b3a397;
-  --accent: #262c20;
-  --accent-foreground: #e4ead9;
+  --background: #1e1a16;
+  --foreground: #efe9e1;
+  --card: #27221d;
+  --card-foreground: #efe9e1;
+  --popover: #27221d;
+  --popover-foreground: #efe9e1;
+  --primary: #d9765d;
+  --primary-foreground: #1e1a16;
+  --secondary: #3d2a22;
+  --secondary-foreground: #f2c9bb;
+  --muted: #2d2722;
+  --muted-foreground: #b2a99d;
+  --accent: #2d2722;
+  --accent-foreground: #efe9e1;
   --destructive: #e5675b;
-  --success: #7cc49a;
-  --warning: #e3b94f;
+  --success: #9fbf92;
+  --success-soft: #26301f;
+  --warning: #eab54a;
   --warning-foreground: #f0d58c;
   --border: rgb(255 255 255 / 12%);
   --input: rgb(255 255 255 / 16%);
-  --ring: #a7b896;
+  --ring: #d9765d;
+  --hero: #2d241d;
+  --band: #25201b;
 }
 
 @layer base {
@@ -96,7 +104,7 @@
   h2,
   h3,
   [data-slot="card-title"] {
-    @apply font-display;
-    letter-spacing: 0.005em;
+    @apply font-display text-[#302e29] dark:text-foreground;
+    letter-spacing: -0.01em;
   }
 }

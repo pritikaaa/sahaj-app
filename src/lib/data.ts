@@ -3,7 +3,7 @@
 import "server-only";
 import { db } from "./supabase";
 import { effectiveStatus } from "./negotiation";
-import type { Job, JobStatus, Negotiation, Profile, SosEvent, SosStatus } from "./types";
+import type { Job, JobStatus, Negotiation, Notification, NotificationKind, Profile, SosEvent, SosStatus } from "./types";
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -37,19 +37,14 @@ export async function updateProfile(id: string, patch: Partial<Profile>): Promis
 export async function listHelpers(opts: {
   excludeId?: string | null;
   chore?: string | null;
-  verifiedOnly?: boolean;
   studentsOnly?: boolean;
 }): Promise<Profile[]> {
   let q = db().from("profiles").select("*").eq("offers_help", true);
   if (opts.excludeId) q = q.neq("id", opts.excludeId);
-  if (opts.verifiedOnly) q = q.eq("verification_status", "verified");
   if (opts.studentsOnly) q = q.eq("is_student", true);
   const rows: Profile[] = check(await q.order("created_at", { ascending: false }));
   const chore = opts.chore;
-  const filtered = chore ? rows.filter((p) => p.chores.includes(chore)) : rows;
-  // Verified helpers first — trust is the #1 family pain point.
-  const rank = (p: Profile) => (p.verification_status === "verified" ? 0 : p.verification_status === "pending" ? 1 : 2);
-  return filtered.sort((a, b) => rank(a) - rank(b));
+  return chore ? rows.filter((p) => p.chores.includes(chore)) : rows;
 }
 
 export async function listPendingVerifications(): Promise<Profile[]> {
@@ -65,6 +60,11 @@ export async function getJob(id: string): Promise<Job | null> {
 
 export async function insertJob(row: Partial<Job>): Promise<Job> {
   return check(await db().from("jobs").insert(row).select("*").single());
+}
+
+/** Remove a job that was just created (used when its first negotiation could not be saved). */
+export async function deleteJob(id: string): Promise<void> {
+  check(await db().from("jobs").delete().eq("id", id).select("id"));
 }
 
 /** Update a job only if it is still in `expect` status. Returns null if it was not. */
@@ -121,11 +121,18 @@ export async function insertNegotiation(row: Partial<Negotiation>): Promise<Nego
   return check(await db().from("negotiations").insert(row).select("*").single());
 }
 
-/** Update only while still active (optimistic concurrency). Returns null if someone got there first. */
-export async function updateActiveNegotiation(id: string, patch: Partial<Negotiation>): Promise<Negotiation | null> {
-  const rows: Negotiation[] = check(
-    await db().from("negotiations").update(patch).eq("id", id).eq("status", "active").select("*")
-  );
+/**
+ * Update only while still active (optimistic concurrency). With `expectedOfferCount`, also only
+ * if no new offer landed since the caller read it. Returns null if someone got there first.
+ */
+export async function updateActiveNegotiation(
+  id: string,
+  patch: Partial<Negotiation>,
+  expectedOfferCount?: number
+): Promise<Negotiation | null> {
+  let q = db().from("negotiations").update(patch).eq("id", id).eq("status", "active");
+  if (expectedOfferCount !== undefined) q = q.eq("offer_count", expectedOfferCount);
+  const rows: Negotiation[] = check(await q.select("*"));
   return rows[0] ?? null;
 }
 
@@ -199,4 +206,63 @@ export async function sosForJob(jobId: string): Promise<SosEvent[]> {
 
 export async function updateSos(id: string, patch: Partial<SosEvent>): Promise<SosEvent> {
   return check(await db().from("sos_events").update(patch).eq("id", id).select("*").single());
+}
+
+// ---------- notifications ----------
+export async function insertNotification(row: Partial<Notification>): Promise<void> {
+  check(await db().from("notifications").insert(row).select("id"));
+}
+
+export async function listNotifications(profileId: string, limit = 20): Promise<Notification[]> {
+  return check(
+    await db().from("notifications").select("*").eq("profile_id", profileId).order("created_at", { ascending: false }).limit(limit)
+  );
+}
+
+export async function unreadNotificationCount(profileId: string): Promise<number> {
+  const res = await db()
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", profileId)
+    .is("read_at", null);
+  if (res.error) throw new Error(res.error.message);
+  return res.count ?? 0;
+}
+
+/** Only marks the row if it belongs to `profileId`. */
+export async function markNotificationRead(id: string, profileId: string): Promise<void> {
+  check(
+    await db()
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("profile_id", profileId)
+      .is("read_at", null)
+      .select("id")
+  );
+}
+
+export async function markAllRead(profileId: string): Promise<void> {
+  check(
+    await db()
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("profile_id", profileId)
+      .is("read_at", null)
+      .select("id")
+  );
+}
+
+/** Negotiation ids (of those given) this person already has a `kind` notification for. */
+export async function notifiedNegotiationIds(profileId: string, kind: NotificationKind, negotiationIds: string[]): Promise<Set<string>> {
+  if (negotiationIds.length === 0) return new Set();
+  const rows: { negotiation_id: string | null }[] = check(
+    await db()
+      .from("notifications")
+      .select("negotiation_id")
+      .eq("profile_id", profileId)
+      .eq("kind", kind)
+      .in("negotiation_id", negotiationIds)
+  );
+  return new Set(rows.map((r) => r.negotiation_id).filter((x): x is string => !!x));
 }

@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { ChorePicker } from "./chore-picker";
-import { AREAS, PRICE_FLOOR } from "@/lib/constants";
+import { AREAS, POLICE_NUMBER, PRICE_FLOOR } from "@/lib/constants";
 import { createProfileAction, saveProfileAction } from "@/app/actions";
 import type { Profile } from "@/lib/types";
 
@@ -66,7 +66,7 @@ export function ProfileForm({ initial, mode }: { initial?: Profile | null; mode:
 
       <fieldset className="bg-muted/50 space-y-3 rounded-lg border p-4">
         <legend className="px-1 text-sm font-medium">Trusted contact for SOS</legend>
-        <p className="text-muted-foreground text-xs">If you press SOS during a booking, the Sahaj team desk sees this number and calls them.</p>
+        <p className="text-muted-foreground text-xs">SOS alerts the Sahaj team desk and dials the police ({POLICE_NUMBER}). The desk can see this contact too.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="tc_name">Name</Label>
@@ -93,7 +93,6 @@ export function ProfileForm({ initial, mode }: { initial?: Profile | null; mode:
               <Switch id="is_student" checked={f.is_student} onCheckedChange={(v) => set("is_student", v)} />
               <div>
                 <Label htmlFor="is_student">I am a student</Label>
-                <p className="text-muted-foreground mt-1 text-xs">Students verify with a student ID; adults with a government ID.</p>
               </div>
             </div>
             <ChorePicker legend="Chores I can do" value={f.chores} onChange={(v) => set("chores", v)} />

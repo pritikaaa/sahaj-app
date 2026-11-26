@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
 import { OfferForm } from "@/components/offer-form";
+import { ServicesForm } from "@/components/services-form";
 import { SetupNeeded } from "@/components/setup-needed";
 import { CHORES } from "@/lib/constants";
 import { getProfilesById, listOpenJobs } from "@/lib/data";
@@ -27,20 +28,30 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Find work</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Find work</h1>
         <p className="text-muted-foreground text-sm">Open jobs from families in Pokhara. Choose one, name your price, agree within a minute.</p>
       </div>
 
-      {me && !me.offers_help && (
-        <Card className="border-warning">
-          <CardContent className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="flex-1">To take jobs, turn on “I also offer help” in your profile. You can keep hiring too.</span>
-            <Button asChild size="sm"><Link href="/profile">Edit profile</Link></Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your services</CardTitle>
+          <CardDescription>
+            {me?.offers_help ? "What families see when they browse helpers." : "Offer help to take paid gigs and appear in Find help."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {me ? (
+            <ServicesForm me={me} />
+          ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <p className="text-muted-foreground flex-1">Sign up to list the chores you can do.</p>
+              <Button asChild><Link href="/signup">Sign up</Link></Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <form className="bg-card flex flex-wrap items-end gap-3 rounded-lg border p-3" aria-label="Filter jobs">
+      <form className="bg-card flex flex-wrap items-end gap-3 rounded-2xl border p-4" aria-label="Filter jobs">
         <div className="min-w-40 flex-1 space-y-1">
           <label htmlFor="chore" className="text-sm font-medium">Chore</label>
           <NativeSelect id="chore" name="chore" defaultValue={sp.chore ?? ""}>
@@ -74,7 +85,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                   </CardContent>
                   <CardFooter className="mt-auto">
                     {me?.offers_help ? <OfferForm jobId={j.id} suggested={j.budget} /> : (
-                      <Button asChild variant="outline" size="sm"><Link href={me ? "/profile" : "/"}>{me ? "Offer help to take this job" : "Choose who you are"}</Link></Button>
+                      <Button asChild variant="outline" size="sm"><Link href={me ? "/jobs" : "/signup"}>{me ? "Start offering help (above) to take this job" : "Sign up to take this job"}</Link></Button>
                     )}
                   </CardFooter>
                 </Card>

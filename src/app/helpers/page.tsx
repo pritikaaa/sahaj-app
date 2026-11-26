@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
-import { VerificationBadge } from "@/components/badges";
 import { SetupNeeded } from "@/components/setup-needed";
 import { CHORES } from "@/lib/constants";
 import { listHelpers } from "@/lib/data";
@@ -16,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function HelpersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ chore?: string; verified?: string; students?: string }>;
+  searchParams: Promise<{ chore?: string; students?: string }>;
 }) {
   const sp = await searchParams;
   const meId = await currentProfileId();
@@ -25,7 +24,6 @@ export default async function HelpersPage({
     helpers = await listHelpers({
       excludeId: meId,
       chore: sp.chore || null,
-      verifiedOnly: sp.verified === "1",
       studentsOnly: sp.students === "1",
     });
   } catch (e) {
@@ -35,11 +33,11 @@ export default async function HelpersPage({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Hire help</h1>
-        <p className="text-muted-foreground text-sm">Browse helpers and choose who you want. Verified helpers are listed first.</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Hire help</h1>
+        <p className="text-muted-foreground text-sm">Browse helpers and choose who you want.</p>
       </div>
 
-      <form className="bg-card flex flex-wrap items-end gap-3 rounded-lg border p-3" aria-label="Filter helpers">
+      <form className="bg-card flex flex-wrap items-end gap-3 rounded-2xl border p-4" aria-label="Filter helpers">
         <div className="min-w-40 flex-1 space-y-1">
           <label htmlFor="chore" className="text-sm font-medium">Chore</label>
           <NativeSelect id="chore" name="chore" defaultValue={sp.chore ?? ""}>
@@ -47,9 +45,6 @@ export default async function HelpersPage({
             {CHORES.map((c) => <option key={c}>{c}</option>)}
           </NativeSelect>
         </div>
-        <label className="flex h-10 items-center gap-2 text-sm">
-          <input type="checkbox" name="verified" value="1" defaultChecked={sp.verified === "1"} className="accent-primary size-4" /> Verified only
-        </label>
         <label className="flex h-10 items-center gap-2 text-sm">
           <input type="checkbox" name="students" value="1" defaultChecked={sp.students === "1"} className="accent-primary size-4" /> Students
         </label>
@@ -64,7 +59,7 @@ export default async function HelpersPage({
             <li key={h.id}>
               <Card className="h-full">
                 <CardHeader>
-                  <CardTitle className="flex flex-wrap items-center gap-2">{h.full_name} <VerificationBadge p={h} /></CardTitle>
+                  <CardTitle>{h.full_name}</CardTitle>
                   <CardDescription className="flex items-center gap-1">
                     <MapPin className="size-3.5" aria-hidden /> {h.area ?? "Pokhara"}
                     {h.is_student && <span>· Student</span>}

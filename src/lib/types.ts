@@ -89,4 +89,17 @@ export interface SosEvent {
   resolved_at: string | null;
 }
 
+export type NotificationKind = "offer_received" | "offer_sent" | "countered" | "accepted" | "declined" | "lapsed";
+
+export interface Notification {
+  id: string;
+  profile_id: string;
+  negotiation_id: string | null;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
